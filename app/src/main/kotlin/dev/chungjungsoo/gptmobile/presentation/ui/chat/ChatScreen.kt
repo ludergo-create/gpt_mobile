@@ -168,7 +168,11 @@ fun ChatScreen(
         autoScrolling = true
         try {
             if (lastMessageIndex >= 0) {
-                listState.animateScrollToItem(lastMessageIndex + 1)
+                // Int.MAX_VALUE scrolls to the absolute bottom of the list.
+                // Scrolling to a specific tail index stops at that item's
+                // top when it is taller than the viewport, which made the
+                // UI "jump up" after a long reply finished rendering.
+                listState.animateScrollToItem(Int.MAX_VALUE)
             }
         } finally {
             autoScrolling = false
@@ -201,7 +205,7 @@ fun ChatScreen(
     // smooth animation here would fight the incoming chunks.
     LaunchedEffect(groupedMessages) {
         if (!userScrolling && lastMessageIndex >= 0) {
-            listState.scrollToItem(lastMessageIndex + 1)
+            listState.scrollToItem(Int.MAX_VALUE)
         }
     }
 
