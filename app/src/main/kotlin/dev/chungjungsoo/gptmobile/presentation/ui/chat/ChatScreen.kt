@@ -71,6 +71,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -158,18 +159,63 @@ fun ChatScreen(
     var isCustomModelDialogOpen by remember { mutableStateOf(false) }
     var customModelInput by remember { mutableStateOf("") }
 
+    // Smart auto-scroll: follow new content unless the user is actively
+    // scrolling; when the user flings back to the bottom, resume following.
+    var userScrolling by remember { mutableStateOf(false) }
+    var autoScrolling by remember { mutableStateOf(false) }
+
     suspend fun animateScrollToLatestMessage() {
-        if (lastMessageIndex >= 0) {
-            listState.animateScrollToItem(lastMessageIndex + 1)
+        autoScrolling = true
+        try {
+            if (lastMessageIndex >= 0) {
+                listState.animateScrollToItem(lastMessageIndex + 1)
+            }
+        } finally {
+            autoScrolling = false
         }
     }
 
+    // Detect user-initiated scrolling (gesture/fling), ignoring our own
+    // programmatic animateScrollToItem calls.
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { inProgress ->
+            if (inProgress && !autoScrolling) {
+                userScrolling = true
+            }
+        }
+    }
+
+    // When the user scrolls back to (near) the bottom, resume auto-follow.
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = info.totalItemsCount
+            total > 0 && lastVisible >= total - 2
+        }.collect { atBottom ->
+            if (atBottom) userScrolling = false
+        }
+    }
+
+    // Follow streaming updates (reply in progress) with instant jumps —
+    // smooth animation here would fight the incoming chunks.
+    LaunchedEffect(groupedMessages) {
+        if (!userScrolling && lastMessageIndex >= 0) {
+            listState.scrollToItem(lastMessageIndex + 1)
+        }
+    }
+
+    // Smooth scroll when a reply completes.
     LaunchedEffect(isIdle) {
-        animateScrollToLatestMessage()
+        if (!userScrolling) {
+            animateScrollToLatestMessage()
+        }
     }
 
     LaunchedEffect(isLoaded) {
-        animateScrollToLatestMessage()
+        if (!userScrolling) {
+            animateScrollToLatestMessage()
+        }
     }
 
     LaunchedEffect(attachmentNotice) {
