@@ -67,6 +67,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -159,67 +160,48 @@ fun ChatScreen(
     var isCustomModelDialogOpen by remember { mutableStateOf(false) }
     var customModelInput by remember { mutableStateOf("") }
 
-    // Smart auto-scroll: follow new content unless the user is actively
-    // scrolling; when the user flings back to the bottom, resume following.
-    var userScrolling by remember { mutableStateOf(false) }
-    var autoScrolling by remember { mutableStateOf(false) }
+    // Smart auto-scroll: follow new content only while the user is (near)
+    // the bottom of the list. If the user scrolls away we stop following;
+    // when they scroll back to the bottom, following resumes automatically.
+    // Driving this purely from "at bottom" avoids the race where the tail of
+    // a user's fling back to the bottom would re-mark them as "scrolling".
+    val isAtBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisibleIndex = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = info.totalItemsCount
+            total > 0 && lastVisibleIndex >= total - 2
+        }
+    }
 
     suspend fun animateScrollToLatestMessage() {
-        autoScrolling = true
-        try {
-            if (lastMessageIndex >= 0) {
-                // Int.MAX_VALUE scrolls to the absolute bottom of the list.
-                // Scrolling to a specific tail index stops at that item's
-                // top when it is taller than the viewport, which made the
-                // UI "jump up" after a long reply finished rendering.
-                listState.animateScrollToItem(Int.MAX_VALUE)
-            }
-        } finally {
-            autoScrolling = false
-        }
-    }
-
-    // Detect user-initiated scrolling (gesture/fling), ignoring our own
-    // programmatic animateScrollToItem calls.
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }.collect { inProgress ->
-            if (inProgress && !autoScrolling) {
-                userScrolling = true
-            }
-        }
-    }
-
-    // When the user scrolls back to (near) the bottom, resume auto-follow.
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            val info = listState.layoutInfo
-            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val total = info.totalItemsCount
-            total > 0 && lastVisible >= total - 2
-        }.collect { atBottom ->
-            if (atBottom) userScrolling = false
+        if (lastMessageIndex >= 0) {
+            // Int.MAX_VALUE scrolls to the absolute bottom of the list.
+            // Scrolling to a specific tail index stops at that item's
+            // top when it is taller than the viewport, which made the
+            // UI "jump up" after a long reply finished rendering.
+            listState.animateScrollToItem(Int.MAX_VALUE)
         }
     }
 
     // Follow streaming updates (reply in progress) with instant jumps —
     // smooth animation here would fight the incoming chunks.
     LaunchedEffect(groupedMessages) {
-        if (!userScrolling && lastMessageIndex >= 0) {
+        if (isAtBottom && lastMessageIndex >= 0) {
             listState.scrollToItem(Int.MAX_VALUE)
         }
     }
 
     // Smooth scroll when a reply completes.
     LaunchedEffect(isIdle) {
-        if (!userScrolling) {
+        if (isAtBottom) {
             animateScrollToLatestMessage()
         }
     }
 
     LaunchedEffect(isLoaded) {
-        if (!userScrolling) {
-            animateScrollToLatestMessage()
-        }
+        // Initial load: always settle at the bottom of the conversation.
+        animateScrollToLatestMessage()
     }
 
     LaunchedEffect(attachmentNotice) {
