@@ -283,6 +283,14 @@ class ChatRepositoryImpl @Inject constructor(
                         when {
                             chunk.error != null -> emit(ApiState.Error(chunk.error.message))
 
+                            chunk.choices?.firstOrNull()?.delta?.reasoningContent != null -> {
+                                emit(ApiState.Thinking(chunk.choices.first().delta.reasoningContent!!))
+                            }
+
+                            chunk.choices?.firstOrNull()?.delta?.reasoning != null -> {
+                                emit(ApiState.Thinking(chunk.choices.first().delta.reasoning!!))
+                            }
+
                             chunk.choices?.firstOrNull()?.delta?.content != null -> {
                                 emit(ApiState.Success(chunk.choices.first().delta.content!!))
                             }
