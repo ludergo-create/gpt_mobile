@@ -57,6 +57,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -138,6 +141,21 @@ fun ChatScreen(
     val lastMessageIndex = groupedMessages.userMessages.lastIndex
 
     val scope = rememberCoroutineScope()
+
+    // Quick toolbar targets the primary (first enabled) platform in this chat.
+    val primaryPlatformUid = chatViewModel.enabledPlatformsInChat.firstOrNull() ?: ""
+    val primaryPlatform = appEnabledPlatforms.firstOrNull { it.uid == primaryPlatformUid }
+    val primaryToolbarModels = remember(primaryPlatform) {
+        (primaryPlatform?.models ?: "")
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .ifEmpty { listOf(primaryPlatform?.model).filterNotNull() }
+    }
+    val primaryToolbarModel = chatPlatformModels[primaryPlatformUid] ?: primaryPlatform?.model ?: ""
+    val primaryToolbarEffort = chatRoom.reasoningEffort ?: primaryPlatform?.reasoningEffort ?: ""
+    var isCustomModelDialogOpen by remember { mutableStateOf(false) }
+    var customModelInput by remember { mutableStateOf("") }
 
     suspend fun animateScrollToLatestMessage() {
         if (lastMessageIndex >= 0) {
@@ -297,7 +315,17 @@ fun ChatScreen(
                 sendButtonEnabled = isIdle,
                 selectedAttachments = selectedAttachments,
                 onFileSelected = { filePath -> chatViewModel.addSelectedFile(filePath) },
-                onFileRemoved = { filePath -> chatViewModel.removeSelectedFile(filePath) }
+                onFileRemoved = { filePath -> chatViewModel.removeSelectedFile(filePath) },
+                toolbarModels = primaryToolbarModels,
+                toolbarCurrentModel = primaryToolbarModel,
+                toolbarCurrentEffort = primaryToolbarEffort,
+                onModelSelected = { model ->
+                    chatViewModel.updateChatPlatformModels(mapOf(primaryPlatformUid to model))
+                },
+                onEffortSelected = { effort ->
+                    chatViewModel.updateChatReasoningEffort(effort)
+                },
+                onCustomModelRequest = { isCustomModelDialogOpen = true }
             ) {
                 chatViewModel.askQuestion()
                 focusManager.clearFocus()
@@ -325,6 +353,40 @@ fun ChatScreen(
                 onConfirmRequest = { models ->
                     chatViewModel.updateChatPlatformModels(models)
                     chatViewModel.closeChatModelDialog()
+                }
+            )
+        }
+
+        if (isCustomModelDialogOpen) {
+            AlertDialog(
+                onDismissRequest = { isCustomModelDialogOpen = false },
+                title = { Text(stringResource(R.string.custom_model)) },
+                text = {
+                    OutlinedTextField(
+                        value = customModelInput,
+                        onValueChange = { customModelInput = it },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.custom_model_hint)) }
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = customModelInput.trim().isNotBlank(),
+                        onClick = {
+                            chatViewModel.updateChatPlatformModels(
+                                mapOf(primaryPlatformUid to customModelInput.trim())
+                            )
+                            customModelInput = ""
+                            isCustomModelDialogOpen = false
+                        }
+                    ) {
+                        Text(stringResource(R.string.confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { isCustomModelDialogOpen = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
                 }
             )
         }
@@ -683,7 +745,14 @@ fun ChatInputBox(
     selectedAttachments: List<ChatAttachmentDraft> = emptyList(),
     onFileSelected: (String) -> Unit = {},
     onFileRemoved: (String) -> Unit = {},
-    onSendButtonClick: () -> Unit = {}
+    onSendButtonClick: () -> Unit = {},
+    // Quick toolbar (model switch + reasoning effort) shown under the input.
+    toolbarModels: List<String> = emptyList(),
+    toolbarCurrentModel: String = "",
+    toolbarCurrentEffort: String = "",
+    onModelSelected: (String) -> Unit = {},
+    onEffortSelected: (String) -> Unit = {},
+    onCustomModelRequest: () -> Unit = {}
 ) {
     val localStyle = LocalTextStyle.current
     val mergedStyle = localStyle.merge(TextStyle(color = LocalContentColor.current))
@@ -765,6 +834,69 @@ fun ChatInputBox(
                 }
             }
         )
+        // Quick toolbar: model name (left) + reasoning effort (right),
+        // visible only when there is an enabled platform in this chat.
+        if (toolbarModels.isNotEmpty() && chatEnabled) {
+            var modelMenuOpen by remember { mutableStateOf(false) }
+            var effortMenuOpen by remember { mutableStateOf(false) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: current model name → dropdown of this platform's models
+                Box {
+                    TextButton(onClick = { modelMenuOpen = true }) {
+                        Text(
+                            text = toolbarCurrentModel.ifEmpty { stringResource(R.string.select_model) },
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    DropdownMenu(expanded = modelMenuOpen, onDismissRequest = { modelMenuOpen = false }) {
+                        toolbarModels.forEach { model ->
+                            DropdownMenuItem(
+                                text = { Text(model) },
+                                onClick = {
+                                    modelMenuOpen = false
+                                    onModelSelected(model)
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.custom_model)) },
+                            onClick = {
+                                modelMenuOpen = false
+                                onCustomModelRequest()
+                            }
+                        )
+                    }
+                }
+                // Right: reasoning effort switch (Low/Medium/High/Max)
+                Box {
+                    TextButton(onClick = { effortMenuOpen = true }) {
+                        Text(
+                            text = stringResource(R.string.reasoning_effort_prefix) + toolbarCurrentEffort,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                    DropdownMenu(expanded = effortMenuOpen, onDismissRequest = { effortMenuOpen = false }) {
+                        listOf("low", "medium", "high", "max").forEach { effort ->
+                            DropdownMenuItem(
+                                text = { Text(effort) },
+                                onClick = {
+                                    effortMenuOpen = false
+                                    onEffortSelected(effort)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

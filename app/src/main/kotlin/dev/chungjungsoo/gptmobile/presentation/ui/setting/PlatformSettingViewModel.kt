@@ -116,9 +116,18 @@ class PlatformSettingViewModel @Inject constructor(
         }
     }
 
-    fun updateApiModel(model: String) {
+    fun updateApiModel(model: String) = updateApiModels(listOf(model))
+
+    fun updateApiModels(models: List<String>) {
+        val trimmed = models.map { it.trim() }.filter { it.isNotBlank() }
         _platformState.value?.let { platform ->
-            updatePlatform(platform.copy(model = model.trim()))
+            val first = trimmed.firstOrNull()
+            updatePlatform(
+                platform.copy(
+                    model = first ?: platform.model,
+                    models = trimmed.takeIf { it.isNotEmpty() }?.joinToString(",")
+                )
+            )
             closeApiModelDialog()
         }
     }

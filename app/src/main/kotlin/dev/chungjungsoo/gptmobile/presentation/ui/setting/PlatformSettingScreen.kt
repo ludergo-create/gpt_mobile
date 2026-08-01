@@ -256,7 +256,7 @@ fun PlatformSettingScreen(
                 PlatformNameDialog(dialogState, platformData.name, settingViewModel)
                 APIUrlDialog(dialogState, platformData.apiUrl, settingViewModel)
                 APIKeyDialog(dialogState, settingViewModel)
-                ModelDialog(dialogState, platformData.model, settingViewModel)
+                ModelDialog(dialogState, platformData.model, platformData.models, settingViewModel)
                 TemperatureDialog(dialogState, platformData.temperature, settingViewModel)
                 TopPDialog(dialogState, platformData.topP, settingViewModel)
                 SystemPromptDialog(dialogState, platformData.systemPrompt ?: "", settingViewModel)

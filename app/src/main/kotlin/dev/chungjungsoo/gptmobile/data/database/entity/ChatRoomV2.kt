@@ -28,7 +28,12 @@ data class ChatRoomV2(
     val createdAt: Long = System.currentTimeMillis() / 1000,
 
     @ColumnInfo(name = "updated_at")
-    val updatedAt: Long = System.currentTimeMillis() / 1000
+    val updatedAt: Long = System.currentTimeMillis() / 1000,
+
+    // Chat-level reasoning effort override (null = fall back to platform setting).
+    // Lets each chat keep its own Low/Medium/High/Max choice per user request.
+    @ColumnInfo(name = "reasoning_effort")
+    val reasoningEffort: String? = null
 ) : Parcelable
 
 class StringListConverter {

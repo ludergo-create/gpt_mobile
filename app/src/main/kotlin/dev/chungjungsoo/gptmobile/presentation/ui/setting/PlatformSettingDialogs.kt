@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -92,14 +93,20 @@ fun APIKeyDialog(
 fun ModelDialog(
     dialogState: PlatformSettingViewModel.DialogState,
     model: String,
+    models: String?,
     settingViewModel: PlatformSettingViewModel
 ) {
     if (dialogState.isApiModelDialogOpen) {
+        val initialModels = (models ?: "")
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .ifEmpty { listOf(model) }
         ModelDialog(
-            initModel = model,
+            initModels = initialModels,
             onDismissRequest = settingViewModel::closeApiModelDialog
         ) { m ->
-            settingViewModel.updateApiModel(m)
+            settingViewModel.updateApiModels(m)
         }
     }
 }
@@ -392,14 +399,14 @@ private fun TimeoutDialog(
 
 @Composable
 private fun ModelDialog(
-    initModel: String,
+    initModels: List<String>,
     onDismissRequest: () -> Unit,
-    onConfirmRequest: (model: String) -> Unit
+    onConfirmRequest: (models: List<String>) -> Unit
 ) {
     val configuration = LocalWindowInfo.current
     val screenWidth = with(LocalDensity.current) { configuration.containerSize.width.toDp() }
     val screenHeight = with(LocalDensity.current) { configuration.containerSize.height.toDp() }
-    var model by remember { mutableStateOf(initModel) }
+    var models by remember { mutableStateOf(initModels.toMutableList()) }
 
     AlertDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -408,23 +415,46 @@ private fun ModelDialog(
             .heightIn(max = screenHeight - 80.dp),
         title = { Text(text = stringResource(R.string.api_model)) },
         text = {
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = model,
-                onValueChange = { model = it },
-                label = { Text(stringResource(R.string.model_name)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                supportingText = {
-                    Text(stringResource(R.string.model_supporting))
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = stringResource(R.string.model_list_description),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+                models.forEachIndexed { index, model ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier.weight(1f),
+                            value = model,
+                            onValueChange = { value ->
+                                models = models.toMutableList().apply { this[index] = value }
+                            },
+                            label = { Text(stringResource(R.string.model)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                        )
+                        TextButton(
+                            enabled = models.size > 1,
+                            onClick = {
+                                models = models.toMutableList().apply { removeAt(index) }
+                            }
+                        ) {
+                            Text(stringResource(R.string.delete))
+                        }
+                    }
                 }
-            )
+                TextButton(onClick = { models = models.toMutableList().apply { add("") } }) {
+                    Text(stringResource(R.string.add_model))
+                }
+            }
         },
         onDismissRequest = onDismissRequest,
         confirmButton = {
             TextButton(
-                enabled = model.isNotBlank(),
-                onClick = { onConfirmRequest(model) }
+                enabled = models.all { it.isNotBlank() },
+                onClick = { onConfirmRequest(models.toList()) }
             ) {
                 Text(stringResource(R.string.confirm))
             }

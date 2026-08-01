@@ -240,6 +240,18 @@ object ChatDatabaseV2Migrations {
         }
     }
 
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Multi-model list per platform (comma-separated; model stays the
+            // default selected item). Existing platforms get their current
+            // model as the first list entry.
+            db.execSQL("ALTER TABLE platform_v2 ADD COLUMN models TEXT")
+            db.execSQL("UPDATE platform_v2 SET models = model WHERE models IS NULL")
+            // Chat-level reasoning effort override (null = use platform setting)
+            db.execSQL("ALTER TABLE chats_v2 ADD COLUMN reasoning_effort TEXT")
+        }
+    }
+
     internal fun legacyFilesToAttachmentsJson(filesValue: String): String {
         val attachments = filesValue
             .split(",")

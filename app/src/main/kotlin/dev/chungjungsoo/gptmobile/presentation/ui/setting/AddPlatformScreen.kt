@@ -56,7 +56,7 @@ fun AddPlatformScreen(
     var apiUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
     var model by remember { mutableStateOf("") }
-    var reasoningEnabled by remember { mutableStateOf(false) }
+    var reasoningEnabled by remember { mutableStateOf(true) }
 
     Scaffold(
         modifier = modifier,

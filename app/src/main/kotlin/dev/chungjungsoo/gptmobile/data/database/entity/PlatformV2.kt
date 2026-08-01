@@ -34,6 +34,9 @@ data class PlatformV2(
     @ColumnInfo(name = "model")
     val model: String,
 
+    @ColumnInfo(name = "models")
+    val models: String? = null,
+
     @ColumnInfo(name = "temperature")
     val temperature: Float? = null,
 

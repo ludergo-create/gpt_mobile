@@ -49,6 +49,16 @@ class SetupViewModelV2 @Inject constructor(
     private val _model = MutableStateFlow("")
     val model: StateFlow<String> = _model.asStateFlow()
 
+    private val _models = MutableStateFlow(listOf(""))
+    val models: StateFlow<List<String>> = _models.asStateFlow()
+
+    // Deep thinking defaults to enabled for new platforms (user decision).
+    private val _reasoningEnabled = MutableStateFlow(true)
+    val reasoningEnabled: StateFlow<Boolean> = _reasoningEnabled.asStateFlow()
+
+    private val _reasoningEffort = MutableStateFlow("high")
+    val reasoningEffort: StateFlow<String> = _reasoningEffort.asStateFlow()
+
     private val _saveStatus = MutableStateFlow<SaveStatus>(SaveStatus.Idle)
     val saveStatus: StateFlow<SaveStatus> = _saveStatus.asStateFlow()
 
@@ -69,6 +79,9 @@ class SetupViewModelV2 @Inject constructor(
         _apiUrl.value = getDefaultApiUrl(clientType)
         _apiKey.value = ""
         _model.value = ""
+        _models.value = listOf("")
+        _reasoningEnabled.value = true
+        _reasoningEffort.value = "high"
         _wizardStep.value = 0
     }
 
@@ -86,6 +99,30 @@ class SetupViewModelV2 @Inject constructor(
 
     fun updateModel(modelName: String) {
         _model.value = modelName
+        _models.value = listOf(modelName).filter { it.isNotBlank() }.ifEmpty { listOf("") }
+    }
+
+    fun updateModels(models: List<String>) {
+        _models.value = models
+        _model.value = models.firstOrNull()?.trim().orEmpty()
+    }
+
+    fun addModel() {
+        _models.update { it + "" }
+    }
+
+    fun removeModel(index: Int) {
+        _models.update { list ->
+            if (list.size <= 1) list else list.toMutableList().apply { removeAt(index) }
+        }
+    }
+
+    fun updateReasoningEnabled(enabled: Boolean) {
+        _reasoningEnabled.value = enabled
+    }
+
+    fun updateReasoningEffort(effort: String) {
+        _reasoningEffort.value = effort
     }
 
     fun nextWizardStep() {
@@ -103,6 +140,9 @@ class SetupViewModelV2 @Inject constructor(
         _apiUrl.value = ""
         _apiKey.value = ""
         _model.value = ""
+        _models.value = listOf("")
+        _reasoningEnabled.value = true
+        _reasoningEffort.value = "high"
     }
 
     fun savePlatform() {
@@ -118,11 +158,13 @@ class SetupViewModelV2 @Inject constructor(
                     apiUrl = _apiUrl.value.trim(),
                     token = _apiKey.value.trim().takeIf { it.isNotEmpty() },
                     model = _model.value.trim(),
+                    models = _models.value.map { it.trim() }.filter { it.isNotBlank() }.joinToString(","),
                     temperature = 1.0f,
                     topP = 1.0f,
                     systemPrompt = ModelConstants.DEFAULT_PROMPT,
                     stream = true,
-                    reasoning = false,
+                    reasoning = _reasoningEnabled.value,
+                    reasoningEffort = _reasoningEffort.value,
                     timeout = 30
                 )
                 settingRepository.addPlatformV2(platform)
@@ -158,7 +200,7 @@ class SetupViewModelV2 @Inject constructor(
         1 -> true
 
         // API key is optional for some providers (e.g., Ollama)
-        2 -> _model.value.isNotBlank()
+        2 -> _models.value.any { it.isNotBlank() }
 
         else -> false
     }

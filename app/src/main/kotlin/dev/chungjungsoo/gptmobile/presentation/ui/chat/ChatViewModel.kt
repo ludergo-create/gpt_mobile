@@ -248,6 +248,16 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun updateChatReasoningEffort(effort: String) {
+        val trimmed = effort.trim()
+        _chatRoom.update { it.copy(reasoningEffort = trimmed) }
+        if (_chatRoom.value.id > 0) {
+            viewModelScope.launch {
+                chatRepository.updateChatReasoningEffort(_chatRoom.value.id, trimmed)
+            }
+        }
+    }
+
     fun retryChat(turnIndex: Int, platformIndex: Int) {
         if (turnIndex !in _groupedMessages.value.assistantMessages.indices) return
         if (platformIndex >= enabledPlatformsInChat.size || platformIndex < 0) return
@@ -902,9 +912,13 @@ class ChatViewModel @Inject constructor(
 
     private fun resolvePlatformModel(platform: PlatformV2): PlatformV2 {
         val chatModel = _chatPlatformModels.value[platform.uid]?.trim().orEmpty()
-        if (chatModel.isBlank() || chatModel == platform.model) return platform
+        val chatEffort = _chatRoom.value.reasoningEffort?.trim().orEmpty()
+        if ((chatModel.isBlank() || chatModel == platform.model) && chatEffort.isBlank()) return platform
 
-        return platform.copy(model = chatModel)
+        return platform.copy(
+            model = if (chatModel.isBlank() || chatModel == platform.model) platform.model else chatModel,
+            reasoningEffort = if (chatEffort.isBlank()) platform.reasoningEffort else chatEffort
+        )
     }
 
     private fun persistCurrentChatSnapshot() {

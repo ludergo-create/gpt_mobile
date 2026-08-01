@@ -27,12 +27,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Switch
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -167,10 +171,18 @@ fun SetupPlatformWizardScreen(
 
                     WIZARD_STEP_MODEL -> {
                         // Collect model state directly inside AnimatedContent for proper recomposition
-                        val currentModel by setupViewModel.model.collectAsStateWithLifecycle()
+                        val currentModels by setupViewModel.models.collectAsStateWithLifecycle()
+                        val currentReasoningEnabled by setupViewModel.reasoningEnabled.collectAsStateWithLifecycle()
+                        val currentReasoningEffort by setupViewModel.reasoningEffort.collectAsStateWithLifecycle()
                         ModelStep(
-                            model = currentModel,
-                            onModelChange = setupViewModel::updateModel
+                            models = currentModels,
+                            reasoningEnabled = currentReasoningEnabled,
+                            reasoningEffort = currentReasoningEffort,
+                            onModelsChange = setupViewModel::updateModels,
+                            onAddModel = setupViewModel::addModel,
+                            onRemoveModel = setupViewModel::removeModel,
+                            onReasoningEnabledChange = setupViewModel::updateReasoningEnabled,
+                            onReasoningEffortChange = setupViewModel::updateReasoningEffort
                         )
                     }
                 }
@@ -428,8 +440,14 @@ private fun ApiKeyStep(
 
 @Composable
 private fun ModelStep(
-    model: String,
-    onModelChange: (String) -> Unit,
+    models: List<String>,
+    reasoningEnabled: Boolean,
+    reasoningEffort: String,
+    onModelsChange: (List<String>) -> Unit,
+    onAddModel: () -> Unit,
+    onRemoveModel: (Int) -> Unit,
+    onReasoningEnabledChange: (Boolean) -> Unit,
+    onReasoningEffortChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -454,18 +472,94 @@ private fun ModelStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Model
-        OutlinedTextField(
-            value = model,
-            onValueChange = onModelChange,
-            label = { Text(stringResource(R.string.model)) },
-            placeholder = { Text(stringResource(R.string.model_name)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            supportingText = {
-                Text(stringResource(R.string.model_supporting))
+        // Models — one row per model, add/delete (list-style per user choice)
+        models.forEachIndexed { index, model ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { value ->
+                        onModelsChange(models.toMutableList().apply { this[index] = value })
+                    },
+                    label = { Text(stringResource(R.string.model)) },
+                    placeholder = { Text(stringResource(R.string.model_name)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    supportingText = {
+                        if (index == 0) {
+                            Text(stringResource(R.string.model_supporting))
+                        }
+                    }
+                )
+                TextButton(
+                    enabled = models.size > 1,
+                    onClick = { onRemoveModel(index) }
+                ) {
+                    Text(stringResource(R.string.delete))
+                }
             }
-        )
+        }
+
+        TextButton(onClick = onAddModel) {
+            Text(stringResource(R.string.add_model))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Deep thinking switch — default enabled for new platforms
+        var effortMenuOpen by remember { mutableStateOf(false) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.extended_thinking),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = stringResource(R.string.extended_thinking_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = reasoningEnabled,
+                onCheckedChange = onReasoningEnabledChange
+            )
+        }
+
+        if (reasoningEnabled) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(R.string.reasoning_effort_prefix).removeSuffix(": "),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Box {
+                    TextButton(onClick = { effortMenuOpen = true }) {
+                        Text(reasoningEffort)
+                    }
+                    DropdownMenu(expanded = effortMenuOpen, onDismissRequest = { effortMenuOpen = false }) {
+                        listOf("low", "medium", "high", "max").forEach { effort ->
+                            DropdownMenuItem(
+                                text = { Text(effort) },
+                                onClick = {
+                                    effortMenuOpen = false
+                                    onReasoningEffortChange(effort)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
