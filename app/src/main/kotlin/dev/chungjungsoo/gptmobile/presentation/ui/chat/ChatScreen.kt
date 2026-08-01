@@ -160,19 +160,30 @@ fun ChatScreen(
     var isCustomModelDialogOpen by remember { mutableStateOf(false) }
     var customModelInput by remember { mutableStateOf("") }
 
-    // Smart auto-scroll: follow new content only while the user is (near)
-    // the bottom of the list. If the user scrolls away we stop following;
-    // when they scroll back to the bottom, following resumes automatically.
-    // Driving this purely from "at bottom" avoids the race where the tail of
-    // a user's fling back to the bottom would re-mark them as "scrolling".
+    // Auto-scroll follows the ChatBox model (smooth-follow-output):
+    //   * `following` starts false and only becomes true once the list is
+    //     really at the bottom (so restoring a session never jumps).
+    //   * ANY user scroll gesture pauses following.
+    //   * When the user scrolls back to the bottom, following resumes.
+    //   * While following, content growth re-scrolls to the absolute bottom.
+    // Precise at-bottom check: the LAST item must be visible AND its bottom
+    // edge must be within a small tolerance of the viewport bottom. The old
+    // `lastVisible >= total - 2` heuristic treated a tall tail message as
+    // "at bottom" even when the user was scrolled into its middle, which
+    // stole the scroll position mid-reply.
+    val bottomTolerancePx = with(LocalDensity.current) { 64.dp.toPx() }
     val isAtBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
-            val lastVisibleIndex = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val total = info.totalItemsCount
-            total > 0 && lastVisibleIndex >= total - 2
+            val lastVisible = info.visibleItemsInfo.lastOrNull()
+                ?: return@derivedStateOf false
+            val atTailItem = lastVisible.index >= info.totalItemsCount - 1
+            val remaining =
+                info.viewportEndOffset - (lastVisible.offset + lastVisible.size)
+            atTailItem && remaining <= bottomTolerancePx
         }
     }
+    var following by remember { mutableStateOf(false) }
 
     suspend fun animateScrollToLatestMessage() {
         if (lastMessageIndex >= 0) {
@@ -184,17 +195,36 @@ fun ChatScreen(
         }
     }
 
+    // Any user gesture pauses following. (Layout-driven position changes —
+    // e.g. thinking blocks collapsing — do not set isScrollInProgress, so
+    // they never count as user interaction.)
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { inProgress ->
+                if (inProgress) {
+                    following = false
+                }
+            }
+    }
+
+    // Reaching the real bottom resumes following.
+    LaunchedEffect(isAtBottom) {
+        if (isAtBottom) {
+            following = true
+        }
+    }
+
     // Follow streaming updates (reply in progress) with instant jumps —
     // smooth animation here would fight the incoming chunks.
     LaunchedEffect(groupedMessages) {
-        if (isAtBottom && lastMessageIndex >= 0) {
+        if (following && lastMessageIndex >= 0) {
             listState.scrollToItem(Int.MAX_VALUE)
         }
     }
 
     // Smooth scroll when a reply completes.
     LaunchedEffect(isIdle) {
-        if (isAtBottom) {
+        if (following) {
             animateScrollToLatestMessage()
         }
     }
