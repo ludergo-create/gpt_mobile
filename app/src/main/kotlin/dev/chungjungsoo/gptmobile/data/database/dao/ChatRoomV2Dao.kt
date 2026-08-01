@@ -24,7 +24,7 @@ interface ChatRoomV2Dao {
 
     @Delete
     suspend fun deleteChatRooms(vararg chatRooms: ChatRoomV2)
-}
 
     @Query("UPDATE chats_v2 SET reasoning_effort = :effort WHERE chat_id = :chatId")
     suspend fun updateReasoningEffort(chatId: Int, effort: String?)
+}
