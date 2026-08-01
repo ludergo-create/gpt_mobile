@@ -97,6 +97,7 @@ fun OpponentChatBubble(
     revisionIndexLabel: String? = null,
     canShowPreviousRevision: Boolean = false,
     canShowNextRevision: Boolean = false,
+    onThinkingExpandChange: ((Boolean) -> Unit)? = null,
     onCopyClick: () -> Unit = {},
     onSelectClick: () -> Unit = {},
     onRetryClick: () -> Unit = {},
@@ -121,7 +122,8 @@ fun OpponentChatBubble(
                 modifier = Modifier.padding(top = 16.dp, start = 8.dp, end = 8.dp),
                 thoughts = thoughts,
                 contentIdentity = contentIdentity,
-                isLoading = isThinking
+                isLoading = isThinking,
+                onExpandChange = onThinkingExpandChange
             )
         }
 

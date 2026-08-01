@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,11 +40,16 @@ fun ThinkingBlock(
     modifier: Modifier = Modifier,
     thoughts: String,
     contentIdentity: Any = thoughts,
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    onExpandChange: ((Boolean) -> Unit)? = null
 ) {
     if (thoughts.isBlank()) return
 
     var isExpanded by remember { mutableStateOf(false) }
+    val currentIsExpanded = isExpanded
+    LaunchedEffect(currentIsExpanded) {
+        onExpandChange?.invoke(currentIsExpanded)
+    }
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
         label = "rotation"
