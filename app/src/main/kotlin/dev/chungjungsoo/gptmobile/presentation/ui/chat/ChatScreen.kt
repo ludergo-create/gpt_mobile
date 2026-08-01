@@ -208,12 +208,11 @@ fun ChatScreen(
             }
     }
 
-    // Reaching the real bottom resumes following. Two paths:
-    //   * gesture ends while still within the bottom tolerance (a small
-    //     nudge near the bottom never changes isAtBottom's value, so the
-    //     value-based LaunchedEffect below would not re-fire);
-    //   * the user scrolls down into the bottom tolerance (isAtBottom
-    //     flips false -> true).
+    // Resuming follow happens ONLY when a user gesture ends while the list
+    // is at the bottom. A value-change resume was removed: during the
+    // thinking expand/collapse animation the layout flickers and isAtBottom
+    // briefly reads true, which re-enabled following mid-gesture and made
+    // the list yank back and forth while the user was reading.
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .filter { !it }
@@ -222,11 +221,6 @@ fun ChatScreen(
                     following = true
                 }
             }
-    }
-    LaunchedEffect(isAtBottom) {
-        if (isAtBottom) {
-            following = true
-        }
     }
 
     // Follow streaming updates (reply in progress) with instant jumps —
@@ -661,11 +655,8 @@ private fun ChatMessagePair(
     }
 }
 
-private fun chatMessagePairKey(message: MessageV2, index: Int): String = if (message.id > 0) {
-    "message-${message.id}"
-} else {
+private fun chatMessagePairKey(message: MessageV2, index: Int): String =
     "message-${message.createdAt}-$index"
-}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
