@@ -245,7 +245,7 @@ fun PlatformSettingScreen(
                     )
                 }
                 ExtendedThinkingSwitch(
-                    modifier = Modifier.height(64.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     enabled = platformData.enabled,
                     isChecked = platformData.reasoning,
                     reasoningEffort = platformData.reasoningEffort,
@@ -333,20 +333,17 @@ fun ExtendedThinkingSwitch(
     onEffortChange: (String) -> Unit
 ) {
     var effortMenuOpen by remember { mutableStateOf(false) }
-    val clickableModifier = if (enabled) {
-        modifier
-            .fillMaxWidth()
-            .clickable(onClick = { onCheckedChange(!isChecked) })
-            .padding(horizontal = 8.dp)
-    } else {
-        modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-    }
     val colors = ListItemDefaults.colors()
 
-    Column(modifier = clickableModifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
         ListItem(
+            modifier = if (enabled) {
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = { onCheckedChange(!isChecked) })
+            } else {
+                Modifier.fillMaxWidth()
+            },
             headlineContent = {
                 Text(
                     text = stringResource(R.string.extended_thinking),
@@ -380,12 +377,12 @@ fun ExtendedThinkingSwitch(
             )
         )
 
-        // 思考等级选择器（仅在开启思考时显示）
+        // 思考等级选择器（仅在开启思考时显示，独立行不触发开关）
         if (isChecked && enabled) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 56.dp, end = 16.dp, bottom = 8.dp),
+                    .padding(start = 56.dp, end = 16.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
