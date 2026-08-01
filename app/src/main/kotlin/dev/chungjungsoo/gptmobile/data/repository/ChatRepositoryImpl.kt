@@ -45,6 +45,7 @@ import dev.chungjungsoo.gptmobile.data.dto.openai.request.ResponseContentPart
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ResponseInputContent
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ResponseInputMessage
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ResponsesRequest
+import dev.chungjungsoo.gptmobile.data.dto.openai.request.ThinkingConfig
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.OutputTextDeltaEvent
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.ReasoningSummaryTextDeltaEvent
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.ResponseErrorEvent
@@ -273,9 +274,14 @@ class ChatRepositoryImpl @Inject constructor(
                     model = platform.model,
                     messages = messages,
                     stream = platform.stream,
-                    temperature = platform.temperature,
-                    topP = platform.topP,
-                    reasoningEffort = if (platform.reasoning) platform.reasoningEffort ?: "high" else null
+                    temperature = if (platform.reasoning) null else platform.temperature,
+                    topP = if (platform.reasoning) null else platform.topP,
+                    reasoningEffort = if (platform.reasoning) platform.reasoningEffort else null,
+                    thinking = if (platform.reasoning) {
+                        ThinkingConfig("enabled")
+                    } else {
+                        ThinkingConfig("disabled")
+                    }
                 )
             },
             stream = { request ->
