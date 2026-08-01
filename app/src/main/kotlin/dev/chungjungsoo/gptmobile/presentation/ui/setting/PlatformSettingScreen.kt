@@ -377,43 +377,49 @@ fun ExtendedThinkingSwitch(
             )
         )
 
-        // 思考等级选择器（仅在开启思考时显示，独立行不触发开关）
-        if (isChecked && enabled) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 56.dp, end = 16.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        // 思考等级选择器（始终显示，深度推理关闭时置灰但可见）
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 56.dp, end = 16.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.reasoning_effort),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isChecked && enabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                },
+                modifier = Modifier.weight(1f)
+            )
+            Box {
                 Text(
-                    text = stringResource(R.string.reasoning_effort),
+                    text = reasoningEffortLabel(reasoningEffort),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
+                    color = if (isChecked && enabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    },
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(enabled = isChecked && enabled) { effortMenuOpen = true }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
-                Box {
-                    Text(
-                        text = reasoningEffortLabel(reasoningEffort),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable(enabled = true) { effortMenuOpen = true }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                    DropdownMenu(
-                        expanded = effortMenuOpen,
-                        onDismissRequest = { effortMenuOpen = false }
-                    ) {
-                        listOf("low", "medium", "high", "max").forEach { effort ->
-                            DropdownMenuItem(
-                                text = { Text(reasoningEffortLabel(effort)) },
-                                onClick = {
-                                    onEffortChange(effort)
-                                    effortMenuOpen = false
-                                }
-                            )
-                        }
+                DropdownMenu(
+                    expanded = effortMenuOpen,
+                    onDismissRequest = { effortMenuOpen = false }
+                ) {
+                    listOf("low", "medium", "high", "max").forEach { effort ->
+                        DropdownMenuItem(
+                            text = { Text(reasoningEffortLabel(effort)) },
+                            onClick = {
+                                onEffortChange(effort)
+                                effortMenuOpen = false
+                            }
+                        )
                     }
                 }
             }
