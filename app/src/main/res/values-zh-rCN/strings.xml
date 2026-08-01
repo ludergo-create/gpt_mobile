@@ -125,7 +125,6 @@
     <string name="select_model">选择模型</string>
     <string name="add_model">添加模型</string>
     <string name="model_list_description">每行一个模型，第一行为默认。</string>
-    <string name="delete">删除</string>
     <string name="enter_api_address">API地址</string>
     <string name="api_address_description">请输入您的 Ollama API 地址，包括端口号，我们将自动在结尾加入 chat/coompletions，因此请仅输入完整地址的前半部分(地址必须以“/”结尾，例如http://192.168.1.100:11434/v1/)</string>
     <string name="ollama_api_address">Ollama API 地址</string>
