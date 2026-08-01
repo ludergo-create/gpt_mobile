@@ -55,7 +55,7 @@ class PlatformSettingViewModel @Inject constructor(
         }
     }
 
-    fun setReasoningEffort(effort: String?) {
+    fun setReasoningEffort(effort: String) {
         _platformState.value?.let { platform ->
             updatePlatform(platform.copy(reasoningEffort = effort))
         }

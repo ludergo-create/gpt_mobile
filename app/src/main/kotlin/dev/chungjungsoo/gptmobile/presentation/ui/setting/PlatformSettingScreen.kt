@@ -328,9 +328,9 @@ fun ExtendedThinkingSwitch(
     modifier: Modifier,
     enabled: Boolean,
     isChecked: Boolean,
-    reasoningEffort: String?,
+    reasoningEffort: String,
     onCheckedChange: (Boolean) -> Unit,
-    onEffortChange: (String?) -> Unit
+    onEffortChange: (String) -> Unit
 ) {
     var effortMenuOpen by remember { mutableStateOf(false) }
     val clickableModifier = if (enabled) {
