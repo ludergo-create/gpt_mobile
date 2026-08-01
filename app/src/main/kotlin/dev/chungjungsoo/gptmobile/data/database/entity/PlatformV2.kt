@@ -49,6 +49,9 @@ data class PlatformV2(
     @ColumnInfo(name = "reasoning")
     val reasoning: Boolean = false,
 
+    @ColumnInfo(name = "reasoning_effort", defaultValue = "'high'")
+    val reasoningEffort: String? = null,
+
     @ColumnInfo(name = "timeout")
     val timeout: Int = 30,
 

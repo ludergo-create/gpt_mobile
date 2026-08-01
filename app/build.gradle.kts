@@ -47,6 +47,18 @@ extensions.configure<ApplicationExtension> {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 用 debug 签名，保证 release 包可直接安装（个人自用足够）
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    // 按 ABI 拆分，只打 arm64-v8a（红米K40等绝大多数现代手机）
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
     compileOptions {

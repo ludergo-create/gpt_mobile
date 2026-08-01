@@ -4,6 +4,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -247,7 +248,9 @@ fun PlatformSettingScreen(
                     modifier = Modifier.height(64.dp),
                     enabled = platformData.enabled,
                     isChecked = platformData.reasoning,
-                    onCheckedChange = { settingViewModel.toggleReasoning() }
+                    reasoningEffort = platformData.reasoningEffort,
+                    onCheckedChange = { settingViewModel.toggleReasoning() },
+                    onEffortChange = { settingViewModel.setReasoningEffort(it) }
                 )
 
                 PlatformNameDialog(dialogState, platformData.name, settingViewModel)
@@ -325,8 +328,11 @@ fun ExtendedThinkingSwitch(
     modifier: Modifier,
     enabled: Boolean,
     isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    reasoningEffort: String?,
+    onCheckedChange: (Boolean) -> Unit,
+    onEffortChange: (String?) -> Unit
 ) {
+    var effortMenuOpen by remember { mutableStateOf(false) }
     val clickableModifier = if (enabled) {
         modifier
             .fillMaxWidth()
@@ -339,40 +345,91 @@ fun ExtendedThinkingSwitch(
     }
     val colors = ListItemDefaults.colors()
 
-    ListItem(
-        modifier = clickableModifier,
-        headlineContent = {
-            Text(
-                text = stringResource(R.string.extended_thinking),
-                overflow = TextOverflow.Ellipsis
+    Column(modifier = clickableModifier) {
+        ListItem(
+            headlineContent = {
+                Text(
+                    text = stringResource(R.string.extended_thinking),
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            supportingContent = {
+                Text(
+                    text = stringResource(R.string.extended_thinking_description),
+                    overflow = TextOverflow.Ellipsis
+                )
+            },
+            leadingContent = {
+                Icon(
+                    imageVector = ImageVector.vectorResource(id = R.drawable.ic_model),
+                    contentDescription = stringResource(R.string.extended_thinking)
+                )
+            },
+            trailingContent = {
+                Switch(
+                    checked = isChecked,
+                    onCheckedChange = null,
+                    enabled = enabled
+                )
+            },
+            colors = ListItemDefaults.colors(
+                headlineColor = if (enabled) colors.headlineColor else colors.disabledHeadlineColor,
+                supportingColor = if (enabled) colors.supportingTextColor else colors.disabledHeadlineColor,
+                leadingIconColor = if (enabled) colors.leadingIconColor else colors.disabledLeadingIconColor,
+                trailingIconColor = if (enabled) colors.trailingIconColor else colors.disabledTrailingIconColor
             )
-        },
-        supportingContent = {
-            Text(
-                text = stringResource(R.string.extended_thinking_description),
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        leadingContent = {
-            Icon(
-                imageVector = ImageVector.vectorResource(id = R.drawable.ic_model),
-                contentDescription = stringResource(R.string.extended_thinking)
-            )
-        },
-        trailingContent = {
-            Switch(
-                checked = isChecked,
-                onCheckedChange = null,
-                enabled = enabled
-            )
-        },
-        colors = ListItemDefaults.colors(
-            headlineColor = if (enabled) colors.headlineColor else colors.disabledHeadlineColor,
-            supportingColor = if (enabled) colors.supportingTextColor else colors.disabledHeadlineColor,
-            leadingIconColor = if (enabled) colors.leadingIconColor else colors.disabledLeadingIconColor,
-            trailingIconColor = if (enabled) colors.trailingIconColor else colors.disabledTrailingIconColor
         )
-    )
+
+        // 思考等级选择器（仅在开启思考时显示）
+        if (isChecked && enabled) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 56.dp, end = 16.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.reasoning_effort),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                Box {
+                    Text(
+                        text = reasoningEffortLabel(reasoningEffort),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable(enabled = true) { effortMenuOpen = true }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                    DropdownMenu(
+                        expanded = effortMenuOpen,
+                        onDismissRequest = { effortMenuOpen = false }
+                    ) {
+                        listOf("low", "medium", "high", "max").forEach { effort ->
+                            DropdownMenuItem(
+                                text = { Text(reasoningEffortLabel(effort)) },
+                                onClick = {
+                                    onEffortChange(effort)
+                                    effortMenuOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun reasoningEffortLabel(effort: String?): String = when (effort) {
+    "low" -> "Low"
+    "medium" -> "Medium"
+    "high" -> "High"
+    "max" -> "Max"
+    else -> "High"
 }
 
 @Composable

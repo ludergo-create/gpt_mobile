@@ -267,6 +267,7 @@
     <string name="collapse">Collapse</string>
     <string name="extended_thinking">Extended Thinking</string>
     <string name="extended_thinking_description">Enable for reasoning models (o1, o3, Claude with thinking, Gemini thinking)</string>
+    <string name="reasoning_effort">Reasoning Effort</string>
 
     <!-- Setup Wizard Strings -->
     <string name="your_platforms">Your Platforms</string>

@@ -274,7 +274,8 @@ class ChatRepositoryImpl @Inject constructor(
                     messages = messages,
                     stream = platform.stream,
                     temperature = platform.temperature,
-                    topP = platform.topP
+                    topP = platform.topP,
+                    reasoningEffort = if (platform.reasoning) platform.reasoningEffort ?: "high" else null
                 )
             },
             stream = { request ->
