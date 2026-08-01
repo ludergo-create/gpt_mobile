@@ -3,10 +3,13 @@ package dev.chungjungsoo.gptmobile.presentation.ui.chat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -103,13 +106,24 @@ fun ThinkingBlock(
         if (isExpanded) {
             val displayText = if (isLoading) thoughts + "●" else thoughts
 
-            ChatMarkdown(
-                content = displayText,
-                contentIdentity = contentIdentity,
+            // Cap the expanded thinking content height with an inner scroll,
+            // mirroring ChatBox's ReasoningContentUI (maxHeight 400px +
+            // overflowY auto). A long chain of thought must not inflate the
+            // LazyColumn item to thousands of pixels — that made the outer
+            // auto-scroll follow logic jitter against layout changes.
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-            )
+                    .heightIn(max = 320.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                ChatMarkdown(
+                    content = displayText,
+                    contentIdentity = contentIdentity,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         if (!isExpanded && thoughts.isNotBlank()) {
