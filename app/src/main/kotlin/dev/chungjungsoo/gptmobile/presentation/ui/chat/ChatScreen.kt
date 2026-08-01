@@ -104,6 +104,7 @@ import dev.chungjungsoo.gptmobile.data.database.entity.effectiveThoughts
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -207,7 +208,21 @@ fun ChatScreen(
             }
     }
 
-    // Reaching the real bottom resumes following.
+    // Reaching the real bottom resumes following. Two paths:
+    //   * gesture ends while still within the bottom tolerance (a small
+    //     nudge near the bottom never changes isAtBottom's value, so the
+    //     value-based LaunchedEffect below would not re-fire);
+    //   * the user scrolls down into the bottom tolerance (isAtBottom
+    //     flips false -> true).
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .filter { !it }
+            .collect {
+                if (isAtBottom) {
+                    following = true
+                }
+            }
+    }
     LaunchedEffect(isAtBottom) {
         if (isAtBottom) {
             following = true
