@@ -150,12 +150,12 @@ fun ThinkingBlock(
             }
 
             // Gesture ends at (near) the bottom -> resume following.
+            val bottomTolerance = with(LocalDensity.current) { 64.dp.toPx() }.toInt().coerceAtLeast(8)
             LaunchedEffect(innerScrollState) {
-                val tolerance = with(LocalDensity.current) { 64.dp.toPx() }.toInt().coerceAtLeast(8)
                 snapshotFlow { innerScrollState.isScrollInProgress }
                     .filter { !it }
                     .collect {
-                        if (innerScrollState.value >= innerScrollState.maxValue - tolerance) {
+                        if (innerScrollState.value >= innerScrollState.maxValue - bottomTolerance) {
                             following = true
                         }
                     }
