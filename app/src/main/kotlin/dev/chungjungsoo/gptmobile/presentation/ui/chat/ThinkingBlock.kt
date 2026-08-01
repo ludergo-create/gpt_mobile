@@ -1,9 +1,6 @@
 package dev.chungjungsoo.gptmobile.presentation.ui.chat
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -103,11 +100,7 @@ fun ThinkingBlock(
             )
         }
 
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
+        if (isExpanded) {
             val displayText = if (isLoading) thoughts + "●" else thoughts
 
             ChatMarkdown(
