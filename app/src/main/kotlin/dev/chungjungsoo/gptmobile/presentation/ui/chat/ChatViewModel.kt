@@ -27,6 +27,7 @@ import dev.chungjungsoo.gptmobile.util.getPlatformName
 import dev.chungjungsoo.gptmobile.util.handleStates
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -119,6 +120,9 @@ class ChatViewModel @Inject constructor(
     // Loading states for each platform
     private val _loadingStates = MutableStateFlow(List<LoadingState>(enabledPlatformsInChat.size) { LoadingState.Idle })
     val loadingStates = _loadingStates.asStateFlow()
+
+    // In-flight generation jobs so the user can stop a reply mid-stream.
+    private val _generationJobs = mutableListOf<Job>()
 
     // Used for text data to show in SelectText Bottom Sheet
     private val _selectedText = MutableStateFlow("")
@@ -282,7 +286,7 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        viewModelScope.launch {
+        val retryJob = viewModelScope.launch {
             val retryContext = groupedMessagesThroughTurn(_groupedMessages.value, turnIndex)
             chatRepository.completeChat(
                 retryContext.userMessages,
@@ -298,6 +302,8 @@ class ChatViewModel @Inject constructor(
                 revisionToAppendOnSuccess = revisionToAppendOnSuccess
             )
         }
+        _generationJobs.add(retryJob)
+        retryJob.invokeOnCompletion { _generationJobs.remove(retryJob) }
     }
 
     fun updateChatTitle(title: String) {
@@ -532,6 +538,13 @@ class ChatViewModel @Inject constructor(
         return Pair(fileName, chatHistoryMarkdown)
     }
 
+    fun stopGeneration() {
+        _generationJobs.forEach { it.cancel() }
+        _generationJobs.clear()
+        // Clear loading so the UI returns to the idle send state.
+        _loadingStates.update { List(enabledPlatformsInChat.size) { LoadingState.Idle } }
+    }
+
     private fun completeChat() {
         // Update all the platform loading states to Loading
         _loadingStates.update { List(enabledPlatformsInChat.size) { LoadingState.Loading } }
@@ -541,7 +554,7 @@ class ChatViewModel @Inject constructor(
         enabledPlatformsInChat.forEachIndexed { idx, platformUid ->
             val platform = _enabledPlatformsInApp.value.firstOrNull { it.uid == platformUid } ?: return@forEachIndexed
             val platformWithChatModel = resolvePlatformModel(platform)
-            viewModelScope.launch {
+            val job = viewModelScope.launch {
                 chatRepository.completeChat(
                     _groupedMessages.value.userMessages,
                     _groupedMessages.value.assistantMessages,
@@ -555,6 +568,8 @@ class ChatViewModel @Inject constructor(
                     }
                 )
             }
+            _generationJobs.add(job)
+            job.invokeOnCompletion { _generationJobs.remove(job) }
         }
     }
 

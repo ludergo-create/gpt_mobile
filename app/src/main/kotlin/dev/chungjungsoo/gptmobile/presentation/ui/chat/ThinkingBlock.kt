@@ -24,7 +24,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -111,12 +115,58 @@ fun ThinkingBlock(
             // overflowY auto). A long chain of thought must not inflate the
             // LazyColumn item to thousands of pixels — that made the outer
             // auto-scroll follow logic jitter against layout changes.
+            //
+            // The inner scroll follows the same model as the chat list:
+            // while the user is not interacting it tracks the bottom (so a
+            // streaming chain of thought stays visible); any gesture pauses
+            // it; scrolling back to the bottom resumes it.
+            val innerScrollState = rememberScrollState()
+            var following by remember { mutableStateOf(false) }
+
+            // Expanding settles at the bottom (wait for the first layout).
+            LaunchedEffect(isExpanded) {
+                if (isExpanded) {
+                    following = true
+                    while (innerScrollState.maxValue <= 0) {
+                        delay(16)
+                    }
+                    innerScrollState.scrollTo(innerScrollState.maxValue)
+                }
+            }
+
+            // Streaming growth follows the bottom while following.
+            LaunchedEffect(thoughts) {
+                if (following && innerScrollState.maxValue > 0) {
+                    innerScrollState.scrollTo(innerScrollState.maxValue)
+                }
+            }
+
+            // Any user gesture pauses following.
+            LaunchedEffect(innerScrollState) {
+                snapshotFlow { innerScrollState.isScrollInProgress }
+                    .collect { inProgress ->
+                        if (inProgress) following = false
+                    }
+            }
+
+            // Gesture ends at (near) the bottom -> resume following.
+            LaunchedEffect(innerScrollState) {
+                val tolerance = with(LocalDensity.current) { 64.dp.toPx() }.toInt().coerceAtLeast(8)
+                snapshotFlow { innerScrollState.isScrollInProgress }
+                    .filter { !it }
+                    .collect {
+                        if (innerScrollState.value >= innerScrollState.maxValue - tolerance) {
+                            following = true
+                        }
+                    }
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
                     .heightIn(max = 320.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(innerScrollState)
             ) {
                 ChatMarkdown(
                     content = displayText,

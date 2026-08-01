@@ -403,6 +403,8 @@ fun ChatScreen(
                     chatViewModel.askQuestion()
                     focusManager.clearFocus()
                 },
+                isGenerating = loadingStates.any { it == ChatViewModel.LoadingState.Loading },
+                onStopClick = chatViewModel::stopGeneration,
                 onCustomModelRequest = { isCustomModelDialogOpen = true }
             )
         }
@@ -820,6 +822,8 @@ fun ChatInputBox(
     onFileSelected: (String) -> Unit = {},
     onFileRemoved: (String) -> Unit = {},
     onSendButtonClick: () -> Unit = {},
+    isGenerating: Boolean = false,
+    onStopClick: () -> Unit = {},
     // Quick toolbar (model switch + reasoning effort) shown under the input.
     toolbarModels: List<String> = emptyList(),
     toolbarCurrentModel: String = "",
@@ -899,11 +903,27 @@ fun ChatInputBox(
                             innerTextField()
                         }
                     }
-                    IconButton(
-                        enabled = chatEnabled && sendButtonEnabled && hasQuestionText,
-                        onClick = onSendButtonClick
-                    ) {
-                        Icon(imageVector = ImageVector.vectorResource(id = R.drawable.ic_send), contentDescription = stringResource(R.string.send))
+                    if (isGenerating) {
+                        // Stop-generation button (square) replaces the send
+                        // button while a reply is streaming.
+                        IconButton(
+                            enabled = chatEnabled,
+                            onClick = onStopClick
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(MaterialTheme.colorScheme.error)
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            enabled = chatEnabled && sendButtonEnabled && hasQuestionText,
+                            onClick = onSendButtonClick
+                        ) {
+                            Icon(imageVector = ImageVector.vectorResource(id = R.drawable.ic_send), contentDescription = stringResource(R.string.send))
+                        }
                     }
                 }
             }
