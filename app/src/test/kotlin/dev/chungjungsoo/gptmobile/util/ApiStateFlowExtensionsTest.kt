@@ -192,6 +192,38 @@ class ApiStateFlowExtensionsTest {
     }
 
     @Test
+    fun `handleStates stores first token latency and provider usage`() = runBlocking {
+        val messageFlow = MutableStateFlow(
+            ChatViewModel.GroupedMessages(
+                userMessages = listOf(MessageV2(content = "Hello", platformType = null)),
+                assistantMessages = listOf(
+                    listOf(MessageV2(content = "", platformType = "platform-1"))
+                )
+            )
+        )
+        val timestamps = listOf(0L, 1_250_000_000L, 1_250_000_000L).iterator()
+
+        flowOf(
+            ApiState.Success("Answer"),
+            ApiState.TokenUsage(inputTokens = 10, outputTokens = 8, totalTokens = 18),
+            ApiState.Done
+        ).handleStates(
+            messageFlow = messageFlow,
+            turnIndex = 0,
+            platformIdx = 0,
+            onLoadingComplete = {},
+            nanoTimeProvider = { timestamps.next() },
+            currentTimeProvider = { 1234L }
+        )
+
+        val assistantMessage = messageFlow.value.assistantMessages[0][0]
+        assertEquals(1_250L, assistantMessage.firstTokenLatencyMillis)
+        assertEquals(10, assistantMessage.inputTokens)
+        assertEquals(8, assistantMessage.outputTokens)
+        assertEquals(18, assistantMessage.totalTokens)
+    }
+
+    @Test
     fun `handleStates appends retry revision only when stream succeeds`() = runBlocking {
         val messageFlow = MutableStateFlow(
             ChatViewModel.GroupedMessages(

@@ -1,5 +1,6 @@
 package dev.chungjungsoo.gptmobile.data.dto.groq.response
 
+import dev.chungjungsoo.gptmobile.data.dto.openai.response.Usage
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -19,6 +20,9 @@ data class GroqChatCompletionChunk(
 
     @SerialName("choices")
     val choices: List<GroqChoice>? = null,
+
+    @SerialName("usage")
+    val usage: Usage? = null,
 
     @SerialName("error")
     val error: GroqErrorDetail? = null

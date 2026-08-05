@@ -20,21 +20,36 @@ suspend fun Flow<ApiState>.handleStates(
     currentTimeProvider: () -> Long = { System.currentTimeMillis() / 1000 },
     revisionToAppendOnSuccess: AssistantRevision? = null
 ) {
+    val requestStartedAtNanos = nanoTimeProvider()
     val buffer = StreamingMessageBuffer(nanoTimeProvider = nanoTimeProvider)
     var isCompletedSuccessfully = false
     var terminalError: String? = null
+    var firstTokenLatencyMillis: Long? = null
+    var tokenUsage: ApiState.TokenUsage? = null
+
+    fun recordFirstToken() {
+        if (firstTokenLatencyMillis == null) {
+            firstTokenLatencyMillis = ((nanoTimeProvider() - requestStartedAtNanos) / 1_000_000L).coerceAtLeast(0L)
+        }
+    }
 
     try {
         collect { chunk ->
             when (chunk) {
                 is ApiState.Thinking -> {
+                    if (chunk.thinkingChunk.isNotEmpty()) recordFirstToken()
                     buffer.appendThought(chunk.thinkingChunk)
                     buffer.publishIfDue(messageFlow, turnIndex, platformIdx)
                 }
 
                 is ApiState.Success -> {
+                    if (chunk.textChunk.isNotEmpty()) recordFirstToken()
                     buffer.appendContent(chunk.textChunk)
                     buffer.publishIfDue(messageFlow, turnIndex, platformIdx)
+                }
+
+                is ApiState.TokenUsage -> {
+                    tokenUsage = chunk
                 }
 
                 ApiState.Done -> {
@@ -63,7 +78,9 @@ suspend fun Flow<ApiState>.handleStates(
                 turnIndex = turnIndex,
                 platformIdx = platformIdx,
                 currentTimeProvider = currentTimeProvider,
-                revisionToAppend = revisionToAppendOnSuccess
+                revisionToAppend = revisionToAppendOnSuccess,
+                firstTokenLatencyMillis = firstTokenLatencyMillis,
+                tokenUsage = tokenUsage
             )
         }
         onLoadingComplete()
@@ -187,7 +204,9 @@ private fun MutableStateFlow<ChatViewModel.GroupedMessages>.setTimestamp(
     turnIndex: Int,
     platformIdx: Int,
     currentTimeProvider: () -> Long,
-    revisionToAppend: AssistantRevision?
+    revisionToAppend: AssistantRevision?,
+    firstTokenLatencyMillis: Long?,
+    tokenUsage: ApiState.TokenUsage?
 ) {
     update { groupedMessages ->
         updateAssistantSlot(
@@ -197,6 +216,10 @@ private fun MutableStateFlow<ChatViewModel.GroupedMessages>.setTimestamp(
         ) { currentMessage ->
             currentMessage.copy(
                 createdAt = currentTimeProvider(),
+                firstTokenLatencyMillis = firstTokenLatencyMillis,
+                inputTokens = tokenUsage?.inputTokens,
+                outputTokens = tokenUsage?.outputTokens,
+                totalTokens = tokenUsage?.totalTokens,
                 revisions = revisionToAppend
                     ?.let { listOf(it) + currentMessage.revisions }
                     ?: currentMessage.revisions

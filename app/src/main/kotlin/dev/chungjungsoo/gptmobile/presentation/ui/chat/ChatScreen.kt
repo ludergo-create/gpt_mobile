@@ -100,8 +100,10 @@ import dev.chungjungsoo.gptmobile.R
 import dev.chungjungsoo.gptmobile.data.database.entity.ACTIVE_REVISION_LATEST
 import dev.chungjungsoo.gptmobile.data.database.entity.MessageV2
 import dev.chungjungsoo.gptmobile.data.database.entity.PlatformV2
+import dev.chungjungsoo.gptmobile.data.database.entity.effectiveAssistantMetrics
 import dev.chungjungsoo.gptmobile.data.database.entity.effectiveContent
 import dev.chungjungsoo.gptmobile.data.database.entity.effectiveThoughts
+import dev.chungjungsoo.gptmobile.util.estimateTokenCount
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -576,16 +578,43 @@ private fun ChatMessagePair(
     val selectedAssistantMessage = assistantMessages.getOrNull(platformIndexState)
     val assistantContent = selectedAssistantMessage?.effectiveContent() ?: ""
     val assistantThoughts = selectedAssistantMessage?.effectiveThoughts() ?: ""
-    val assistantTimestamp = selectedAssistantMessage?.let { assistantMessage ->
-        assistantMessage.revisions
-            .getOrNull(assistantMessage.activeRevisionIndex)
-            ?.createdAt
-            ?: assistantMessage.createdAt
-    }?.takeIf {
+    val assistantHasPayload = selectedAssistantMessage?.let {
         assistantContent.isNotBlank() ||
             assistantThoughts.isNotBlank() ||
-            selectedAssistantMessage.attachments.isNotEmpty()
+            it.attachments.isNotEmpty()
+    } == true
+    val assistantMetrics = selectedAssistantMessage?.effectiveAssistantMetrics()
+    val answerTokenCount = if (assistantHasPayload) {
+        val storedTokenCount = assistantMetrics?.totalTokens ?: assistantMetrics?.outputTokens
+        storedTokenCount ?: estimateTokenCount(
+            text = "$assistantThoughts\n$assistantContent"
+        ).takeIf { it > 0 }
+    } else {
+        null
     }
+    val answerTokensAreEstimated = assistantHasPayload &&
+        assistantMetrics?.totalTokens == null &&
+        assistantMetrics?.outputTokens == null
+    val conversationTokenEntries = assistantMessages.mapNotNull { assistantMessage ->
+        val content = assistantMessage.effectiveContent()
+        val thoughts = assistantMessage.effectiveThoughts()
+        val hasPayload = content.isNotBlank() || thoughts.isNotBlank() || assistantMessage.attachments.isNotEmpty()
+        if (!hasPayload) {
+            null
+        } else {
+            val metrics = assistantMessage.effectiveAssistantMetrics()
+            val tokenCount = metrics.totalTokens ?: metrics.outputTokens ?: estimateTokenCount("$thoughts\n$content")
+            if (tokenCount == 0 && metrics.totalTokens == null && metrics.outputTokens == null) {
+                null
+            } else {
+                tokenCount to (metrics.totalTokens == null && metrics.outputTokens == null)
+            }
+        }
+    }
+    val conversationTokenCount = conversationTokenEntries
+        .takeIf { it.isNotEmpty() }
+        ?.sumOf { it.first }
+    val conversationTokensAreEstimated = conversationTokenEntries.any { it.second }
     val canShowPreviousRevision = selectedAssistantMessage?.let { assistantMessage ->
         assistantMessage.revisions.isNotEmpty() &&
             assistantMessage.activeRevisionIndex < assistantMessage.revisions.lastIndex
@@ -611,7 +640,6 @@ private fun ChatMessagePair(
                     modifier = Modifier.widthIn(max = maximumUserChatBubbleWidth),
                     text = message.content,
                     files = message.attachments.map { it.filePathForDisplay },
-                    timestamp = message.createdAt,
                     onLongPress = { isDropDownMenuExpanded = true }
                 )
                 ChatBubbleDropdownMenu(
@@ -667,7 +695,11 @@ private fun ChatMessagePair(
                 text = assistantContent,
                 thoughts = assistantThoughts,
                 attachments = selectedAssistantMessage?.attachments.orEmpty().map { it.filePathForDisplay },
-                timestamp = assistantTimestamp,
+                firstTokenLatencyMillis = assistantMetrics?.firstTokenLatencyMillis,
+                answerTokenCount = answerTokenCount,
+                conversationTokenCount = conversationTokenCount,
+                answerTokensAreEstimated = answerTokensAreEstimated,
+                conversationTokensAreEstimated = conversationTokensAreEstimated,
                 contentIdentity = "$messageIndex:$selectedPlatformUid",
                 revisionIndexLabel = selectedAssistantMessage?.let { assistantMessage ->
                     val totalRevisions = assistantMessage.revisions.size + 1

@@ -12,8 +12,26 @@ data class GenerateContentResponse(
     @SerialName("promptFeedback")
     val promptFeedback: PromptFeedback? = null,
 
+    @SerialName("usageMetadata")
+    val usageMetadata: UsageMetadata? = null,
+
     @SerialName("error")
     val error: ErrorDetail? = null
+)
+
+@Serializable
+data class UsageMetadata(
+    @SerialName("promptTokenCount")
+    val promptTokenCount: Int? = null,
+
+    @SerialName("candidatesTokenCount")
+    val candidatesTokenCount: Int? = null,
+
+    @SerialName("totalTokenCount")
+    val totalTokenCount: Int? = null,
+
+    @SerialName("thoughtsTokenCount")
+    val thoughtsTokenCount: Int? = null
 )
 
 @Serializable

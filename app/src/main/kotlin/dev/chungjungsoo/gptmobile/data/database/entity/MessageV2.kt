@@ -50,14 +50,36 @@ data class MessageV2(
     val platformType: String?,
 
     @ColumnInfo(name = "created_at")
-    val createdAt: Long = System.currentTimeMillis() / 1000
+    val createdAt: Long = System.currentTimeMillis() / 1000,
+
+    @ColumnInfo(name = "first_token_latency_millis")
+    val firstTokenLatencyMillis: Long? = null,
+
+    @ColumnInfo(name = "input_tokens")
+    val inputTokens: Int? = null,
+
+    @ColumnInfo(name = "output_tokens")
+    val outputTokens: Int? = null,
+
+    @ColumnInfo(name = "total_tokens")
+    val totalTokens: Int? = null
 )
 
 @Serializable
 data class AssistantRevision(
     val content: String,
     val thoughts: String = "",
-    val createdAt: Long
+    val createdAt: Long,
+    val firstTokenLatencyMillis: Long? = null,
+    val inputTokens: Int? = null,
+    val outputTokens: Int? = null,
+    val totalTokens: Int? = null
+)
+
+data class EffectiveAssistantMetrics(
+    val firstTokenLatencyMillis: Long?,
+    val totalTokens: Int?,
+    val outputTokens: Int?
 )
 
 const val ACTIVE_REVISION_LATEST = -1
@@ -89,6 +111,27 @@ fun MessageV2.snapshotLatestAssistantRevision(timestamp: Long = System.currentTi
     return AssistantRevision(
         content = content,
         thoughts = thoughts,
-        createdAt = timestamp
+        createdAt = timestamp,
+        firstTokenLatencyMillis = firstTokenLatencyMillis,
+        inputTokens = inputTokens,
+        outputTokens = outputTokens,
+        totalTokens = totalTokens
     )
+}
+
+fun MessageV2.effectiveAssistantMetrics(): EffectiveAssistantMetrics {
+    val revision = revisions.getOrNull(activeRevisionIndex)
+    return if (revision != null) {
+        EffectiveAssistantMetrics(
+            firstTokenLatencyMillis = revision.firstTokenLatencyMillis,
+            totalTokens = revision.totalTokens,
+            outputTokens = revision.outputTokens
+        )
+    } else {
+        EffectiveAssistantMetrics(
+            firstTokenLatencyMillis = firstTokenLatencyMillis,
+            totalTokens = totalTokens,
+            outputTokens = outputTokens
+        )
+    }
 }

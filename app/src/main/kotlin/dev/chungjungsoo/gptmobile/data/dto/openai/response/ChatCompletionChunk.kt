@@ -20,6 +20,9 @@ data class ChatCompletionChunk(
     @SerialName("choices")
     val choices: List<Choice>? = null,
 
+    @SerialName("usage")
+    val usage: Usage? = null,
+
     @SerialName("error")
     val error: ErrorDetail? = null
 )
