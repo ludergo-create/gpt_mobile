@@ -1084,21 +1084,21 @@ internal fun MessageV2.sendableAssistantContent(): String {
 internal fun MessageV2.hasSendableAssistantPayload(): Boolean = sendableAssistantContent().isNotBlank() || attachments.isNotEmpty()
 
 private fun OpenAIUsage.toApiTokenUsage(): ApiState.TokenUsage? {
-    val inputTokens = inputTokens ?: promptTokens
-    val outputTokens = outputTokens ?: completionTokens
-    val resolvedTotalTokens = totalTokens
-        ?: if (inputTokens != null && outputTokens != null) {
-            inputTokens + outputTokens
+    val resolvedInputTokens = this.inputTokens ?: this.promptTokens
+    val resolvedOutputTokens = this.outputTokens ?: this.completionTokens
+    val resolvedTotalTokens = this.totalTokens
+        ?: if (resolvedInputTokens != null && resolvedOutputTokens != null) {
+            resolvedInputTokens + resolvedOutputTokens
         } else {
             null
         }
 
-    return if (inputTokens == null && outputTokens == null && resolvedTotalTokens == null) {
+    return if (resolvedInputTokens == null && resolvedOutputTokens == null && resolvedTotalTokens == null) {
         null
     } else {
         ApiState.TokenUsage(
-            inputTokens = inputTokens,
-            outputTokens = outputTokens,
+            inputTokens = resolvedInputTokens,
+            outputTokens = resolvedOutputTokens,
             totalTokens = resolvedTotalTokens
         )
     }
