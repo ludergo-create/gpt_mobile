@@ -44,11 +44,12 @@ jobs:
         id: artifact-upload-step
         with:
           name: debug-${{ github.sha }}
-          path: ${{ github.workspace }}/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ github.workspace }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
       - name: Comment APK Link
         uses: thollander/actions-comment-pull-request@v3
         with:
-          comment_tag: apk
+          comment-tag: apk
           message: |
             Build complete! Here's the debug APK: ${{ steps.artifact-upload-step.outputs.artifact-url }}
