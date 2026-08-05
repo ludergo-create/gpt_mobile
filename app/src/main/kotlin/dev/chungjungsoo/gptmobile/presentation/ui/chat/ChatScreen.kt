@@ -73,6 +73,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -185,14 +186,32 @@ fun ChatScreen(
         }
     }
     var following by remember { mutableStateOf(false) }
+    var hasPositionedInitialContent by remember { mutableStateOf(false) }
 
-    suspend fun animateScrollToLatestMessage() {
-        if (lastMessageIndex >= 0) {
-            // Int.MAX_VALUE scrolls to the absolute bottom of the list.
-            // Scrolling to a specific tail index stops at that item's
-            // top when it is taller than the viewport, which made the
-            // UI "jump up" after a long reply finished rendering.
+    suspend fun scrollToLatestMessage(animate: Boolean = true) {
+        if (lastMessageIndex < 0) return
+
+        // The message state and LazyColumn are updated in different passes.
+        // Wait for the loaded items to be measured before requesting the
+        // bottom position, otherwise entering an existing chat can leave the
+        // list at its initial top position.
+        while (listState.layoutInfo.totalItemsCount == 0) {
+            withFrameNanos { }
+        }
+
+        // Int.MAX_VALUE scrolls to the absolute bottom of the list. A few
+        // extra layout passes are needed because Markdown/math content can
+        // still grow after the first measure.
+        if (animate) {
             listState.animateScrollToItem(Int.MAX_VALUE)
+        } else {
+            listState.scrollToItem(Int.MAX_VALUE)
+        }
+        repeat(12) {
+            withFrameNanos { }
+            if (listState.canScrollForward) {
+                listState.scrollToItem(Int.MAX_VALUE)
+            }
         }
     }
 
@@ -234,13 +253,19 @@ fun ChatScreen(
     // Smooth scroll when a reply completes.
     LaunchedEffect(isIdle) {
         if (following) {
-            animateScrollToLatestMessage()
+            scrollToLatestMessage()
         }
     }
 
-    LaunchedEffect(isLoaded) {
-        // Initial load: always settle at the bottom of the conversation.
-        animateScrollToLatestMessage()
+    LaunchedEffect(isLoaded, groupedMessages.userMessages.size) {
+        if (isLoaded && !hasPositionedInitialContent) {
+            // Initial load should follow the tail while the first response
+            // layout settles. Set this after the programmatic scroll so the
+            // scroll observer cannot mistake that movement for a user drag.
+            scrollToLatestMessage(animate = false)
+            following = true
+            hasPositionedInitialContent = true
+        }
     }
 
     LaunchedEffect(attachmentNotice) {
@@ -312,7 +337,9 @@ fun ChatScreen(
                             canUseChat = canUseChat,
                             isIdle = isIdle,
                             isActiveMessage = false,
-                            onThinkingExpandChange = { _ -> following = false },
+                            onThinkingExpandChange = { isExpanded ->
+                                if (isExpanded) following = false
+                            },
                             maximumUserChatBubbleWidth = maximumUserChatBubbleWidth,
                             maximumOpponentChatBubbleWidth = maximumOpponentChatBubbleWidth,
                             onEditQuestion = chatViewModel::openUserMessageEditDialog,
@@ -343,7 +370,9 @@ fun ChatScreen(
                                 canUseChat = canUseChat,
                                 isIdle = isIdle,
                                 isActiveMessage = true,
-                                onThinkingExpandChange = { _ -> following = false },
+                                onThinkingExpandChange = { isExpanded ->
+                                    if (isExpanded) following = false
+                                },
                                 maximumUserChatBubbleWidth = maximumUserChatBubbleWidth,
                                 maximumOpponentChatBubbleWidth = maximumOpponentChatBubbleWidth,
                                 onEditQuestion = chatViewModel::openUserMessageEditDialog,
@@ -547,6 +576,16 @@ private fun ChatMessagePair(
     val selectedAssistantMessage = assistantMessages.getOrNull(platformIndexState)
     val assistantContent = selectedAssistantMessage?.effectiveContent() ?: ""
     val assistantThoughts = selectedAssistantMessage?.effectiveThoughts() ?: ""
+    val assistantTimestamp = selectedAssistantMessage?.let { assistantMessage ->
+        assistantMessage.revisions
+            .getOrNull(assistantMessage.activeRevisionIndex)
+            ?.createdAt
+            ?: assistantMessage.createdAt
+    }?.takeIf {
+        assistantContent.isNotBlank() ||
+            assistantThoughts.isNotBlank() ||
+            selectedAssistantMessage.attachments.isNotEmpty()
+    }
     val canShowPreviousRevision = selectedAssistantMessage?.let { assistantMessage ->
         assistantMessage.revisions.isNotEmpty() &&
             assistantMessage.activeRevisionIndex < assistantMessage.revisions.lastIndex
@@ -572,6 +611,7 @@ private fun ChatMessagePair(
                     modifier = Modifier.widthIn(max = maximumUserChatBubbleWidth),
                     text = message.content,
                     files = message.attachments.map { it.filePathForDisplay },
+                    timestamp = message.createdAt,
                     onLongPress = { isDropDownMenuExpanded = true }
                 )
                 ChatBubbleDropdownMenu(
@@ -627,6 +667,7 @@ private fun ChatMessagePair(
                 text = assistantContent,
                 thoughts = assistantThoughts,
                 attachments = selectedAssistantMessage?.attachments.orEmpty().map { it.filePathForDisplay },
+                timestamp = assistantTimestamp,
                 contentIdentity = "$messageIndex:$selectedPlatformUid",
                 revisionIndexLabel = selectedAssistantMessage?.let { assistantMessage ->
                     val totalRevisions = assistantMessage.revisions.size + 1

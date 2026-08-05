@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,12 +48,16 @@ import androidx.compose.ui.unit.dp
 import dev.chungjungsoo.gptmobile.R
 import dev.chungjungsoo.gptmobile.presentation.theme.GPTMobileTheme
 import java.io.File
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun UserChatBubble(
     modifier: Modifier = Modifier,
     text: String,
     files: List<String> = emptyList(),
+    timestamp: Long? = null,
     onLongPress: () -> Unit
 ) {
     val cardColor = CardColors(
@@ -62,12 +67,14 @@ fun UserChatBubble(
         disabledContainerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.38f)
     )
 
-    Column(horizontalAlignment = Alignment.End) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.End
+    ) {
         Card(
-            modifier = modifier
-                .pointerInput(Unit) {
-                    detectTapGestures(onLongPress = { onLongPress.invoke() })
-                },
+            modifier = Modifier.pointerInput(Unit) {
+                detectTapGestures(onLongPress = { onLongPress.invoke() })
+            },
             shape = RoundedCornerShape(32.dp),
             colors = cardColor
         ) {
@@ -80,6 +87,12 @@ fun UserChatBubble(
             files = files,
             modifier = Modifier.padding(top = 8.dp)
         )
+        timestamp?.let { createdAt ->
+            MessageTimestamp(
+                timestamp = createdAt,
+                modifier = Modifier.padding(top = 4.dp, end = 8.dp)
+            )
+        }
     }
 }
 
@@ -92,6 +105,7 @@ fun OpponentChatBubble(
     text: String,
     thoughts: String = "",
     attachments: List<String> = emptyList(),
+    timestamp: Long? = null,
     contentIdentity: Any = text,
     canEdit: Boolean = false,
     revisionIndexLabel: String? = null,
@@ -151,6 +165,13 @@ fun OpponentChatBubble(
             }
 
             if (!isLoading) {
+                timestamp?.let { createdAt ->
+                    MessageTimestamp(
+                        timestamp = createdAt,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+
                 Row(
                     modifier = Modifier.padding(start = 16.dp)
                 ) {
@@ -202,6 +223,27 @@ fun OpponentChatBubble(
             }
         }
     }
+}
+
+@Composable
+private fun MessageTimestamp(
+    timestamp: Long,
+    modifier: Modifier = Modifier
+) {
+    val dateFormat = remember {
+        DateFormat.getDateTimeInstance(
+            DateFormat.SHORT,
+            DateFormat.SHORT,
+            Locale.getDefault()
+        )
+    }
+
+    Text(
+        text = dateFormat.format(Date(timestamp * 1_000L)),
+        modifier = modifier,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+    )
 }
 
 @Composable
