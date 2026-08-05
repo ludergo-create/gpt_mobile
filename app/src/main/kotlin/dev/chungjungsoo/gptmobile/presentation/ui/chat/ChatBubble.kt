@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import dev.chungjungsoo.gptmobile.R
 import dev.chungjungsoo.gptmobile.presentation.theme.GPTMobileTheme
 import java.io.File
+import java.util.Locale
 
 @Composable
 fun UserChatBubble(
@@ -62,12 +63,14 @@ fun UserChatBubble(
         disabledContainerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.38f)
     )
 
-    Column(horizontalAlignment = Alignment.End) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.End
+    ) {
         Card(
-            modifier = modifier
-                .pointerInput(Unit) {
-                    detectTapGestures(onLongPress = { onLongPress.invoke() })
-                },
+            modifier = Modifier.pointerInput(Unit) {
+                detectTapGestures(onLongPress = { onLongPress.invoke() })
+            },
             shape = RoundedCornerShape(32.dp),
             colors = cardColor
         ) {
@@ -92,6 +95,11 @@ fun OpponentChatBubble(
     text: String,
     thoughts: String = "",
     attachments: List<String> = emptyList(),
+    firstTokenLatencyMillis: Long? = null,
+    answerTokenCount: Int? = null,
+    conversationTokenCount: Int? = null,
+    answerTokensAreEstimated: Boolean = false,
+    conversationTokensAreEstimated: Boolean = false,
     contentIdentity: Any = text,
     canEdit: Boolean = false,
     revisionIndexLabel: String? = null,
@@ -151,6 +159,15 @@ fun OpponentChatBubble(
             }
 
             if (!isLoading) {
+                MessageMetrics(
+                    firstTokenLatencyMillis = firstTokenLatencyMillis,
+                    answerTokenCount = answerTokenCount,
+                    conversationTokenCount = conversationTokenCount,
+                    answerTokensAreEstimated = answerTokensAreEstimated,
+                    conversationTokensAreEstimated = conversationTokensAreEstimated,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                )
+
                 Row(
                     modifier = Modifier.padding(start = 16.dp)
                 ) {
@@ -203,6 +220,63 @@ fun OpponentChatBubble(
         }
     }
 }
+
+@Composable
+private fun MessageMetrics(
+    firstTokenLatencyMillis: Long?,
+    answerTokenCount: Int?,
+    conversationTokenCount: Int?,
+    answerTokensAreEstimated: Boolean,
+    conversationTokensAreEstimated: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val metrics = buildList {
+        firstTokenLatencyMillis?.let { latencyMillis ->
+            add(
+                stringResource(
+                    R.string.first_token_latency,
+                    formatFirstTokenLatency(latencyMillis)
+                )
+            )
+        }
+        answerTokenCount?.let { tokenCount ->
+            add(
+                stringResource(
+                    if (answerTokensAreEstimated) {
+                        R.string.estimated_answer_token_count
+                    } else {
+                        R.string.answer_token_count
+                    },
+                    tokenCount
+                )
+            )
+        }
+        conversationTokenCount?.let { tokenCount ->
+            add(
+                stringResource(
+                    if (conversationTokensAreEstimated) {
+                        R.string.estimated_conversation_token_count
+                    } else {
+                        R.string.conversation_token_count
+                    },
+                    tokenCount
+                )
+            )
+        }
+    }
+
+    if (metrics.isNotEmpty()) {
+        Text(
+            text = metrics.joinToString(" · "),
+            modifier = modifier,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+        )
+    }
+}
+
+private fun formatFirstTokenLatency(latencyMillis: Long): String =
+    String.format(Locale.getDefault(), "%.1fs", latencyMillis / 1_000.0)
 
 @Composable
 fun GPTMobileIcon(loading: Boolean) {

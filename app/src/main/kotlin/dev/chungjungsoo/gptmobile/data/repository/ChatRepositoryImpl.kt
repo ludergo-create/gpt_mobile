@@ -26,12 +26,15 @@ import dev.chungjungsoo.gptmobile.data.dto.anthropic.common.MessageRole
 import dev.chungjungsoo.gptmobile.data.dto.anthropic.common.TextContent as AnthropicTextContent
 import dev.chungjungsoo.gptmobile.data.dto.anthropic.request.InputMessage
 import dev.chungjungsoo.gptmobile.data.dto.anthropic.request.MessageRequest
+import dev.chungjungsoo.gptmobile.data.dto.anthropic.response.MessageDeltaResponseChunk
+import dev.chungjungsoo.gptmobile.data.dto.anthropic.response.MessageStartResponseChunk
 import dev.chungjungsoo.gptmobile.data.dto.google.common.Content
 import dev.chungjungsoo.gptmobile.data.dto.google.common.Part
 import dev.chungjungsoo.gptmobile.data.dto.google.common.Role as GoogleRole
 import dev.chungjungsoo.gptmobile.data.dto.google.request.GenerateContentRequest
 import dev.chungjungsoo.gptmobile.data.dto.google.request.GenerationConfig
 import dev.chungjungsoo.gptmobile.data.dto.google.request.SafetySetting
+import dev.chungjungsoo.gptmobile.data.dto.google.response.UsageMetadata
 import dev.chungjungsoo.gptmobile.data.dto.groq.request.GroqChatCompletionRequest
 import dev.chungjungsoo.gptmobile.data.dto.openai.common.ImageContent as OpenAIImageContent
 import dev.chungjungsoo.gptmobile.data.dto.openai.common.ImageUrl
@@ -48,8 +51,10 @@ import dev.chungjungsoo.gptmobile.data.dto.openai.request.ResponsesRequest
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ThinkingConfig
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.OutputTextDeltaEvent
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.ReasoningSummaryTextDeltaEvent
+import dev.chungjungsoo.gptmobile.data.dto.openai.response.ResponseCompletedEvent
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.ResponseErrorEvent
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.ResponseFailedEvent
+import dev.chungjungsoo.gptmobile.data.dto.openai.response.Usage as OpenAIUsage
 import dev.chungjungsoo.gptmobile.data.model.ApiType
 import dev.chungjungsoo.gptmobile.data.model.ClientType
 import dev.chungjungsoo.gptmobile.data.model.GeminiSafetySettings
@@ -188,6 +193,12 @@ class ChatRepositoryImpl @Inject constructor(
 
                             is OutputTextDeltaEvent -> emit(ApiState.Success(event.delta))
 
+                            is ResponseCompletedEvent -> {
+                                event.response.usage
+                                    ?.toApiTokenUsage()
+                                    ?.let { emit(it) }
+                            }
+
                             is ResponseFailedEvent -> {
                                 val errorMessage = event.response.error?.message ?: "Response failed"
                                 emit(ApiState.Error(errorMessage))
@@ -235,6 +246,9 @@ class ChatRepositoryImpl @Inject constructor(
                             chunk.error != null -> emit(ApiState.Error(chunk.error.message))
 
                             else -> {
+                                chunk.usage
+                                    ?.toApiTokenUsage()
+                                    ?.let { emit(it) }
                                 val choice = chunk.choices?.firstOrNull()
                                 parser.append(
                                     reasoningChunk = choice?.delta?.reasoning ?: choice?.message?.reasoning,
@@ -287,6 +301,9 @@ class ChatRepositoryImpl @Inject constructor(
             stream = { request ->
                 flow {
                     openAIAPI.streamChatCompletion(request, platform.timeout).collect { chunk ->
+                        chunk.usage
+                            ?.toApiTokenUsage()
+                            ?.let { emit(it) }
                         when {
                             chunk.error != null -> emit(ApiState.Error(chunk.error.message))
 
@@ -560,8 +577,19 @@ class ChatRepositoryImpl @Inject constructor(
             },
             stream = { request ->
                 flow {
+                    var inputTokens: Int? = null
+                    var outputTokens: Int? = null
                     anthropicAPI.streamChatMessage(request, platform.timeout).collect { chunk ->
                         when (chunk) {
+                            is MessageStartResponseChunk -> {
+                                inputTokens = chunk.message.usage.inputTokens
+                                outputTokens = chunk.message.usage.outputTokens
+                            }
+
+                            is MessageDeltaResponseChunk -> {
+                                outputTokens = chunk.usage.outputTokens
+                            }
+
                             is dev.chungjungsoo.gptmobile.data.dto.anthropic.response.ContentDeltaResponseChunk -> {
                                 when (chunk.delta.type) {
                                     dev.chungjungsoo.gptmobile.data.dto.anthropic.response.ContentBlockType.THINKING_DELTA -> {
@@ -582,6 +610,20 @@ class ChatRepositoryImpl @Inject constructor(
 
                             else -> {}
                         }
+                    }
+
+                    if (inputTokens != null || outputTokens != null) {
+                        emit(
+                            ApiState.TokenUsage(
+                                inputTokens = inputTokens,
+                                outputTokens = outputTokens,
+                                totalTokens = if (inputTokens != null && outputTokens != null) {
+                                    inputTokens!! + outputTokens!!
+                                } else {
+                                    null
+                                }
+                            )
+                        )
                     }
                 }
             }
@@ -669,7 +711,9 @@ class ChatRepositoryImpl @Inject constructor(
             },
             stream = { request ->
                 flow {
+                    var usageMetadata: UsageMetadata? = null
                     googleAPI.streamGenerateContent(request, platform.model, platform.timeout).collect { response ->
+                        usageMetadata = response.usageMetadata ?: usageMetadata
                         when {
                             response.error != null -> emit(ApiState.Error(response.error.message))
 
@@ -693,6 +737,24 @@ class ChatRepositoryImpl @Inject constructor(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    usageMetadata?.let { usage ->
+                        if (usage.promptTokenCount != null ||
+                            usage.candidatesTokenCount != null ||
+                            usage.thoughtsTokenCount != null ||
+                            usage.totalTokenCount != null
+                        ) {
+                            emit(
+                                ApiState.TokenUsage(
+                                    inputTokens = usage.promptTokenCount,
+                                    outputTokens = usage.candidatesTokenCount?.let { candidates ->
+                                        candidates + (usage.thoughtsTokenCount ?: 0)
+                                    },
+                                    totalTokens = usage.totalTokenCount
+                                )
+                            )
                         }
                     }
                 }
@@ -1020,6 +1082,27 @@ internal fun MessageV2.sendableAssistantContent(): String {
 }
 
 internal fun MessageV2.hasSendableAssistantPayload(): Boolean = sendableAssistantContent().isNotBlank() || attachments.isNotEmpty()
+
+private fun OpenAIUsage.toApiTokenUsage(): ApiState.TokenUsage? {
+    val resolvedInputTokens = this.inputTokens ?: this.promptTokens
+    val resolvedOutputTokens = this.outputTokens ?: this.completionTokens
+    val resolvedTotalTokens = this.totalTokens
+        ?: if (resolvedInputTokens != null && resolvedOutputTokens != null) {
+            resolvedInputTokens + resolvedOutputTokens
+        } else {
+            null
+        }
+
+    return if (resolvedInputTokens == null && resolvedOutputTokens == null && resolvedTotalTokens == null) {
+        null
+    } else {
+        ApiState.TokenUsage(
+            inputTokens = resolvedInputTokens,
+            outputTokens = resolvedOutputTokens,
+            totalTokens = resolvedTotalTokens
+        )
+    }
+}
 
 internal fun validateResponseInputPartsOrThrow(messageContent: String, partCount: Int, messageId: Int) {
     if (messageContent.isBlank() && partCount == 0) {

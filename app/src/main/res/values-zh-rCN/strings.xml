@@ -244,4 +244,9 @@
     <string name="gemini_safety_block_only_high">仅屏蔽高风险</string>
     <string name="gemini_safety_block_medium_and_above">屏蔽中等及以上</string>
     <string name="gemini_safety_block_low_and_above">屏蔽低及以上</string>
+    <string name="first_token_latency">思考 %1$s</string>
+    <string name="answer_token_count">本回答 %1$d tokens</string>
+    <string name="conversation_token_count">对话累计 %1$d tokens</string>
+    <string name="estimated_answer_token_count">本回答 约 %1$d tokens</string>
+    <string name="estimated_conversation_token_count">对话累计 约 %1$d tokens</string>
 </resources>

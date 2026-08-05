@@ -263,7 +263,10 @@ data class ResponseObject(
     val status: String? = null,
 
     @SerialName("error")
-    val error: ResponseError? = null
+    val error: ResponseError? = null,
+
+    @SerialName("usage")
+    val usage: Usage? = null
 )
 
 @Serializable

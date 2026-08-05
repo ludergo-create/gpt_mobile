@@ -304,4 +304,9 @@
     <string name="revision_counter">Revision %1$d/%2$d</string>
     <string name="previous_revision" translatable="false">Previous revision</string>
     <string name="next_revision" translatable="false">Next revision</string>
+    <string name="first_token_latency">Thinking %1$s</string>
+    <string name="answer_token_count">This answer %1$d tokens</string>
+    <string name="conversation_token_count">Conversation %1$d tokens</string>
+    <string name="estimated_answer_token_count">This answer ≈%1$d tokens</string>
+    <string name="estimated_conversation_token_count">Conversation ≈%1$d tokens</string>
 </resources>

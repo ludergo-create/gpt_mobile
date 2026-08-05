@@ -458,6 +458,7 @@ class ChatViewModel @Inject constructor(
         val updatedAttachments = attachments.mapNotNull { it.attachment }
 
         val textChanged = currentMessage.content != updatedContent || currentMessage.thoughts != updatedThoughts
+        val responseChanged = textChanged || currentMessage.attachments != updatedAttachments
         val updatedRevisions = if (textChanged) {
             currentMessage.snapshotLatestAssistantRevision(currentTimeStamp)
                 ?.let { listOf(it) + currentMessage.revisions }
@@ -477,7 +478,11 @@ class ChatViewModel @Inject constructor(
                     thoughts = updatedThoughts,
                     attachments = updatedAttachments,
                     revisions = updatedRevisions,
-                    createdAt = assistantMessage.createdAt
+                    createdAt = assistantMessage.createdAt,
+                    firstTokenLatencyMillis = if (responseChanged) null else assistantMessage.firstTokenLatencyMillis,
+                    inputTokens = if (responseChanged) null else assistantMessage.inputTokens,
+                    outputTokens = if (responseChanged) null else assistantMessage.outputTokens,
+                    totalTokens = if (responseChanged) null else assistantMessage.totalTokens
                 ).resetActiveRevision()
             }
         }

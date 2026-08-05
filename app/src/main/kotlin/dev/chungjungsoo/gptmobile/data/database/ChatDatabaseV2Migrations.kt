@@ -252,6 +252,19 @@ object ChatDatabaseV2Migrations {
         }
     }
 
+    val MESSAGE_METRICS_COLUMN_MIGRATIONS = listOf(
+        "ALTER TABLE `messages_v2` ADD COLUMN `first_token_latency_millis` INTEGER",
+        "ALTER TABLE `messages_v2` ADD COLUMN `input_tokens` INTEGER",
+        "ALTER TABLE `messages_v2` ADD COLUMN `output_tokens` INTEGER",
+        "ALTER TABLE `messages_v2` ADD COLUMN `total_tokens` INTEGER"
+    )
+
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            MESSAGE_METRICS_COLUMN_MIGRATIONS.forEach(db::execSQL)
+        }
+    }
+
     internal fun legacyFilesToAttachmentsJson(filesValue: String): String {
         val attachments = filesValue
             .split(",")
