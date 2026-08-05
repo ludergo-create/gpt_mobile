@@ -280,7 +280,7 @@ fun ChatScreen(
     LaunchedEffect(imeVisible) {
         if (imeVisible) {
             delay(100) // Small delay to let keyboard animation start
-            animateScrollToLatestMessage()
+            scrollToLatestMessage()
         }
     }
 
@@ -405,7 +405,7 @@ fun ChatScreen(
                     ) {
                         ScrollToBottomButton {
                             scope.launch {
-                                animateScrollToLatestMessage()
+                                scrollToLatestMessage()
                             }
                         }
                     }
